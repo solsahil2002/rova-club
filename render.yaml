@@ -1,14 +1,21 @@
 services:
   - type: web
     name: yacht-booking
-    env: python
+    runtime: python
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: SECRET_KEY
         generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS

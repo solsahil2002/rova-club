@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, session
+from datetime import datetime, timedelta, timezone
 import random
 import smtplib
 from email.mime.text import MIMEText
@@ -8,12 +9,14 @@ from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsp
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "secret123")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
 
-ADMIN_EMAIL = "admin@yacht.com"
-ADMIN_PASSWORD = "1234"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@yacht.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "1234")
 
 TOTAL_TICKETS = 30
-otp_storage = {}
 
 BOOKINGS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS bookings (
@@ -25,6 +28,14 @@ CREATE TABLE IF NOT EXISTS bookings (
     amount NUMERIC(10, 2),
     code INTEGER,
     status TEXT
+)
+"""
+
+OTP_CODES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS otp_codes (
+    email TEXT PRIMARY KEY,
+    otp INTEGER NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL
 )
 """
 
@@ -97,12 +108,69 @@ def initialize_database(conn):
 
     try:
         cursor.execute(BOOKINGS_TABLE_SQL)
+        cursor.execute(OTP_CODES_TABLE_SQL)
         conn.commit()
     except Exception:
         conn.rollback()
         raise
     finally:
         cursor.close()
+
+
+def store_otp(email, otp):
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            INSERT INTO otp_codes (email, otp, expires_at)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (email)
+            DO UPDATE SET otp = EXCLUDED.otp, expires_at = EXCLUDED.expires_at
+            """,
+            (email, otp, expires_at),
+        )
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def verify_stored_otp(email, user_otp):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT otp, expires_at
+            FROM otp_codes
+            WHERE email = %s
+            """,
+            (email,),
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            return False
+
+        otp, expires_at = row
+        if expires_at < datetime.now(timezone.utc):
+            cursor.execute("DELETE FROM otp_codes WHERE email = %s", (email,))
+            conn.commit()
+            return False
+
+        if int(user_otp) != otp:
+            return False
+
+        cursor.execute("DELETE FROM otp_codes WHERE email = %s", (email,))
+        conn.commit()
+        return True
+    finally:
+        cursor.close()
+        conn.close()
 
 
 # =========================
@@ -232,7 +300,7 @@ def login():
             return "Email required ❌"
 
         otp = random.randint(100000, 999999)
-        otp_storage[email] = otp
+        store_otp(email, otp)
 
         if send_otp_email(email, otp):
             session['email'] = email
@@ -256,7 +324,7 @@ def verify():
             email and
             user_otp and
             user_otp.isdigit() and
-            int(user_otp) == otp_storage.get(email)
+            verify_stored_otp(email, user_otp)
         ):
             session['logged_in'] = True
             return redirect('/booking')
@@ -405,6 +473,20 @@ def test_db():
 
     except Exception as e:
         return f"DB Error ❌ {e}"
+
+
+@app.route('/healthz')
+def healthz():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1;")
+        cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return {"status": "ok"}, 200
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}, 500
 
 
 # =========================
