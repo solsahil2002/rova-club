@@ -3,6 +3,8 @@ services:
     name: yacht-booking
     runtime: python
     plan: starter
+    domains:
+      - therovaclub.in
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     healthCheckPath: /healthz
