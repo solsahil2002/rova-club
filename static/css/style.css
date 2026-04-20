@@ -1,0 +1,61 @@
+body {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+    color: white;
+}
+
+/* HERO SECTION */
+.hero {
+    height: 100vh;
+    background: url('/static/images/yacht.jpg') no-repeat center/cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: 60px;
+    margin: 0;
+}
+
+.hero p {
+    font-size: 20px;
+    opacity: 0.8;
+}
+
+.btn {
+    padding: 12px 25px;
+    background: #00cec9;
+    border: none;
+    border-radius: 8px;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.btn:hover {
+    background: #81ecec;
+    transform: scale(1.05);
+}
+
+/* CARD STYLE */
+.card {
+    background: rgba(255,255,255,0.1);
+    padding: 20px;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    margin: 20px auto;
+    width: 80%;
+}
+
+/* INPUT */
+input {
+    padding: 10px;
+    width: 100%;
+    border-radius: 6px;
+    border: none;
+    margin: 10px 0;
+}

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: #0f172a;
+            color: white;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+        }
+
+        .box {
+            background: rgba(255,255,255,0.08);
+            padding: 20px;
+            border-radius: 15px;
+            width: 22%;
+            text-align: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .container {
+            width: 90%;
+            margin: auto;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 12px;
+        }
+
+        .pending {
+            color: orange;
+        }
+
+        .confirmed {
+            color: #00ffcc;
+        }
+
+        button {
+            padding: 8px 15px;
+            background: #00d4ff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #00aaff;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<h1>🧑‍💻 Admin Dashboard</h1>
+
+<div class="stats">
+    <div class="box">
+        <h3>Total Bookings</h3>
+        <p>{{ total_bookings }}</p>
+    </div>
+
+    <div class="box">
+        <h3>Revenue</h3>
+        <p>₹{{ total_revenue }}</p>
+    </div>
+
+    <div class="box">
+        <h3>Sold Tickets</h3>
+        <p>{{ sold }}</p>
+    </div>
+
+    <div class="box">
+        <h3>Pending</h3>
+        <p>{{ pending }}</p>
+    </div>
+</div>
+
+<div class="container">
+
+{% for b in bookings %}
+<div class="card">
+
+    <p><strong>Code:</strong> {{ b[6] }}</p>
+    <p><strong>Name:</strong> {{ b[1] }}</p>
+    <p><strong>Tickets:</strong> {{ b[4] }}</p>
+    <p><strong>Amount:</strong> ₹{{ b[5] }}</p>
+
+    <p>
+        <strong>Status:</strong>
+        {% if b[7] == 'pending' %}
+            <span class="pending">Pending ⏳</span>
+        {% else %}
+            <span class="confirmed">Confirmed ✅</span>
+        {% endif %}
+    </p>
+
+    {% if b[7] == 'pending' %}
+        <a href="/approve/{{ b[6] }}">
+            <button>Approve</button>
+        </a>
+    {% endif %}
+
+</div>
+{% endfor %}
+
+</div>
+
+</body>
+</html>
