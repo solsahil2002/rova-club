@@ -58,6 +58,12 @@
             font-size: 14px;
         }
 
+        .error {
+            margin-top: 12px;
+            color: #ffd2d2;
+            font-size: 13px;
+        }
+
         input {
             width: 100%;
             padding: 12px;
@@ -108,10 +114,14 @@
         <p>Sold: {{ sold }}</p>
     </div>
 
-    <form method="POST">
-        <input type="number" name="tickets" min="1" max="{{ available }}" placeholder="Enter number of tickets" required>
+    {% if db_error %}
+        <p class="error">Booking is temporarily unavailable. Please try again in a few minutes.</p>
+    {% endif %}
 
-        <button type="submit">Continue 🚀</button>
+    <form method="POST">
+        <input type="number" name="tickets" min="1" max="{{ available }}" placeholder="Enter number of tickets" required {% if db_error or available == 0 %}disabled{% endif %}>
+
+        <button type="submit" {% if db_error or available == 0 %}disabled{% endif %}>Continue 🚀</button>
     </form>
 
 </div>

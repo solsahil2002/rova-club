@@ -17,6 +17,7 @@ ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@yacht.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "1234")
 
 TOTAL_TICKETS = 30
+BOOKING_CODE_RETRIES = 10
 
 BOOKINGS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS bookings (
@@ -30,6 +31,10 @@ CREATE TABLE IF NOT EXISTS bookings (
     status TEXT
 )
 """
+
+BOOKINGS_TABLE_MIGRATIONS = (
+    "ALTER TABLE bookings ADD COLUMN IF NOT EXISTS attendees TEXT",
+)
 
 OTP_CODES_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS otp_codes (
@@ -108,6 +113,8 @@ def initialize_database(conn):
 
     try:
         cursor.execute(BOOKINGS_TABLE_SQL)
+        for statement in BOOKINGS_TABLE_MIGRATIONS:
+            cursor.execute(statement)
         cursor.execute(OTP_CODES_TABLE_SQL)
         conn.commit()
     except Exception:
@@ -115,6 +122,18 @@ def initialize_database(conn):
         raise
     finally:
         cursor.close()
+
+
+def delete_stored_otp(email):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM otp_codes WHERE email = %s", (email,))
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
 
 
 def store_otp(email, otp):
@@ -171,6 +190,26 @@ def verify_stored_otp(email, user_otp):
     finally:
         cursor.close()
         conn.close()
+
+
+def generate_booking_code():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        for _ in range(BOOKING_CODE_RETRIES):
+            booking_code = random.randint(1000, 9999)
+            cursor.execute(
+                "SELECT 1 FROM bookings WHERE code = %s LIMIT 1",
+                (booking_code,),
+            )
+            if not cursor.fetchone():
+                return booking_code
+    finally:
+        cursor.close()
+        conn.close()
+
+    raise RuntimeError("Could not generate a unique booking code.")
 
 
 # =========================
@@ -306,6 +345,7 @@ def login():
             session['email'] = email
             return redirect('/verify')
 
+        delete_stored_otp(email)
         return "Email send failed ❌"
 
     return render_template('login.html')
@@ -352,16 +392,20 @@ def booking():
         cursor.close()
         conn.close()
 
-    except:
-        sold_tickets = 0
+    except Exception as e:
+        app.logger.exception("Could not fetch booking stats")
+        return render_template('booking.html', available=0, sold=0, db_error=str(e))
 
-    available = TOTAL_TICKETS - sold_tickets
+    available = max(TOTAL_TICKETS - sold_tickets, 0)
 
     if request.method == 'POST':
         try:
             tickets = int(request.form.get('tickets'))
-        except:
+        except (TypeError, ValueError):
             return "Invalid ticket input ❌"
+
+        if tickets < 1:
+            return "At least 1 ticket required ❌"
 
         if tickets > available:
             return f"Only {available} tickets left ❌"
@@ -394,6 +438,8 @@ def details():
         return redirect('/login')
 
     tickets = session.get('tickets')
+    if not tickets:
+        return redirect('/booking')
 
     if request.method == 'POST':
         session['name'] = request.form.get('name')
@@ -413,16 +459,24 @@ def payment():
     if not session.get('logged_in'):
         return redirect('/login')
 
-    if request.method == 'POST':
-        booking_code = random.randint(1000, 9999)
+    if not all([
+        session.get('tickets'),
+        session.get('amount'),
+        session.get('name'),
+        session.get('phone'),
+        session.get('email'),
+    ]):
+        return redirect('/details')
 
+    if request.method == 'POST':
         try:
+            booking_code = generate_booking_code()
             conn = get_db_connection()
             cursor = conn.cursor()
 
             cursor.execute("""
-                INSERT INTO bookings (name, phone, email, tickets, amount, code, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO bookings (name, phone, email, tickets, amount, code, status, attendees)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 session.get('name'),
                 session.get('phone'),
@@ -430,7 +484,8 @@ def payment():
                 session.get('tickets'),
                 session.get('amount'),
                 booking_code,
-                "pending"
+                "pending",
+                "\n".join(session.get('people', [])),
             ))
 
             conn.commit()
@@ -459,6 +514,9 @@ def pending():
 # =========================
 @app.route('/test-db')
 def test_db():
+    if os.environ.get("ALLOW_TEST_DB_ROUTE") != "true":
+        return "Not Found", 404
+
     try:
         conn = get_db_connection()
         cursor = conn.cursor()

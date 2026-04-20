@@ -101,8 +101,13 @@
 
     <p><strong>Code:</strong> {{ b[6] }}</p>
     <p><strong>Name:</strong> {{ b[1] }}</p>
+    <p><strong>Phone:</strong> {{ b[2] }}</p>
+    <p><strong>Email:</strong> {{ b[3] }}</p>
     <p><strong>Tickets:</strong> {{ b[4] }}</p>
     <p><strong>Amount:</strong> ₹{{ b[5] }}</p>
+    {% if b|length > 8 and b[8] %}
+        <p><strong>Attendees:</strong><br>{{ b[8] | replace('\n', '<br>') | safe }}</p>
+    {% endif %}
 
     <p>
         <strong>Status:</strong>
