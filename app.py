@@ -216,6 +216,53 @@ def generate_booking_code():
 
 
 # =========================
+# 📧 EMAIL HELPERS
+# =========================
+def send_email(receiver_email, subject, body):
+    sender_email = os.environ.get("EMAIL_USER")
+    app_password = os.environ.get("EMAIL_PASS")
+
+    if not sender_email or not app_password:
+        app.logger.error("Email creds missing")
+        return False
+
+    try:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = sender_email
+        msg["To"] = receiver_email
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, app_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
+        server.quit()
+
+        return True
+    except Exception:
+        app.logger.exception("Email send failed")
+        return False
+
+
+def send_booking_confirmation_email(booking):
+    receiver_email = booking["email"]
+    if not receiver_email:
+        return False
+
+    body = (
+        f"Hi {booking['name']},\n\n"
+        "Your booking has been confirmed.\n\n"
+        f"Booking Code: {booking['code']}\n"
+        f"Tickets: {booking['tickets']}\n"
+        f"Amount Paid: Rs. {booking['amount']}\n\n"
+        "Please keep this booking code with you for entry.\n\n"
+        "Thank you,\n"
+        "The Rova Club"
+    )
+    return send_email(receiver_email, "Booking Confirmed - The Rova Club", body)
+
+
+# =========================
 # 🔐 ADMIN LOGIN
 # =========================
 @app.route('/admin-login', methods=['GET', 'POST'])
@@ -281,13 +328,30 @@ def approve_booking(booking_code):
 
     try:
         cursor.execute(
-            "UPDATE bookings SET status = 'confirmed' WHERE code = %s",
+            """
+            UPDATE bookings
+            SET status = 'confirmed'
+            WHERE code = %s
+            RETURNING name, email, tickets, amount, code
+            """,
             (booking_code,),
         )
+        booking = cursor.fetchone()
         conn.commit()
     finally:
         cursor.close()
         conn.close()
+
+    if booking:
+        send_booking_confirmation_email(
+            {
+                "name": booking[0],
+                "email": booking[1],
+                "tickets": booking[2],
+                "amount": booking[3],
+                "code": booking[4],
+            }
+        )
 
     return redirect('/admin')
 
@@ -296,30 +360,7 @@ def approve_booking(booking_code):
 # 📩 SEND OTP EMAIL
 # =========================
 def send_otp_email(receiver_email, otp):
-    sender_email = os.environ.get("EMAIL_USER")
-    app_password = os.environ.get("EMAIL_PASS")
-
-    if not sender_email or not app_password:
-        print("Email creds missing ❌")
-        return False
-
-    try:
-        msg = MIMEText(f"Your OTP is {otp}")
-        msg['Subject'] = "OTP Verification"
-        msg['From'] = sender_email
-        msg['To'] = receiver_email
-
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, app_password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
-        server.quit()
-
-        return True
-
-    except Exception as e:
-        print("Email Error:", e)
-        return False
+    return send_email(receiver_email, "OTP Verification", f"Your OTP is {otp}")
 
 
 # =========================
