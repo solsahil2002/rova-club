@@ -5,7 +5,10 @@ import smtplib
 from email.mime.text import MIMEText
 import psycopg2
 import os
+from dotenv import load_dotenv
 from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "secret123")
