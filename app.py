@@ -16,6 +16,17 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("FLASK_ENV") == "production"
 
+BASE_PRICE = int(os.environ.get("BASE_PRICE", 8500))
+DISCOUNT_PERCENT = int(os.environ.get("DISCOUNT_PERCENT", 0))
+OVERRIDE_PRICE = os.environ.get("OVERRIDE_PRICE")
+
+def get_final_price():
+    if OVERRIDE_PRICE:
+        return int(OVERRIDE_PRICE)
+    
+    discount_amount = (BASE_PRICE * DISCOUNT_PERCENT) / 100
+    return int(BASE_PRICE - discount_amount)
+
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@yacht.com")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "1234")
 
@@ -366,9 +377,18 @@ def send_otp_email(receiver_email, otp):
 # =========================
 # 🏠 HOME
 # =========================
-@app.route('/')
+
 def home():
-    return render_template('index.html')
+    price = get_final_price()
+    override = OVERRIDE_PRICE and OVERRIDE_PRICE.strip() != ""
+
+    return render_template(
+        "index.html",
+        price=price,
+        base_price=BASE_PRICE,
+        discount=DISCOUNT_PERCENT,
+        override=override
+    )
 
 
 # =========================
@@ -426,19 +446,20 @@ def booking():
     if not session.get('logged_in'):
         return redirect('/login')
 
+    # 🔒 Get sold tickets
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Count both pending + confirmed to avoid overselling before admin approval.
+
         cursor.execute(
-            "SELECT COALESCE(SUM(tickets),0) FROM bookings WHERE status IN ('pending', 'confirmed')"
+            "SELECT COALESCE(SUM(tickets),0) FROM bookings WHERE status IN ('pending','confirmed')"
         )
-        sold_tickets = cursor.fetchone()[0]
+        sold_tickets = cursor.fetchone()[0] or 0
 
         cursor.close()
         conn.close()
-
+        
     except Exception as e:
         app.logger.exception("Could not fetch booking stats")
         return render_template('booking.html', available=0, sold=0, db_error=str(e))
@@ -446,8 +467,9 @@ def booking():
     available = max(TOTAL_TICKETS - sold_tickets, 0)
 
     if request.method == 'POST':
+        # 🔢 validate tickets
         try:
-            tickets = int(request.form.get('tickets'))
+            tickets = int(request.form.get('tickets', '0'))
         except (TypeError, ValueError):
             return "Invalid ticket input ❌"
 
@@ -457,16 +479,9 @@ def booking():
         if tickets > available:
             return f"Only {available} tickets left ❌"
 
-        price = 8500
-        total = tickets * price
-
-        discount = 0
-        if tickets == 6:
-            discount = 0.10
-        elif tickets >= 7:
-            discount = 0.15
-
-        final_amount = int(total - (total * discount))
+        # 💰 FINAL PRICE ONLY (no extra discount here)
+        price = get_final_price()
+        final_amount = int(tickets * price)
 
         session['tickets'] = tickets
         session['amount'] = final_amount

@@ -285,7 +285,25 @@
     <div class="content">
         <div class="title">THE ROVA CLUB 🛥️</div>
         <div class="subtitle">Luxury • Music • Cocktails • Night Vibes</div>
-
+    
+        <!-- 💰 PRICE SECTION -->
+        <div style="margin-top:20px; font-size:24px; color:white;">
+    
+            {% if override %}
+                <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
+                <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
+    
+            {% elif discount > 0 %}
+                <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
+                <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
+                <span style="color:red; font-size:16px;"> ({{ discount }}% OFF)</span>
+    
+            {% else %}
+                <span style="color:#00ffa6; font-weight:bold;">₹{{ price }}</span>
+            {% endif %}
+    
+        </div>
+    
         <a href="/login">
             <button class="btn">Get Started 🚀</button>
         </a>
