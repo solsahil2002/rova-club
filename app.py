@@ -21,7 +21,7 @@ DISCOUNT_PERCENT = int(os.environ.get("DISCOUNT_PERCENT", 0))
 OVERRIDE_PRICE = os.environ.get("OVERRIDE_PRICE")
 
 def get_final_price():
-    if OVERRIDE_PRICE:
+    if OVERRIDE_PRICE and OVERRIDE_PRICE.strip() != "":
         return int(OVERRIDE_PRICE)
     
     discount_amount = (BASE_PRICE * DISCOUNT_PERCENT) / 100
@@ -378,6 +378,7 @@ def send_otp_email(receiver_email, otp):
 # 🏠 HOME
 # =========================
 
+@app.route("/")
 def home():
     price = get_final_price()
     override = OVERRIDE_PRICE and OVERRIDE_PRICE.strip() != ""
@@ -441,36 +442,34 @@ def verify():
 # =========================
 # 🎟️ BOOKING
 # =========================
+
 @app.route('/booking', methods=['GET', 'POST'])
 def booking():
     if not session.get('logged_in'):
         return redirect('/login')
 
-    # 🔒 Get sold tickets
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
-
         cursor.execute(
             "SELECT COALESCE(SUM(tickets),0) FROM bookings WHERE status IN ('pending','confirmed')"
         )
-        sold_tickets = cursor.fetchone()[0] or 0
+        sold_tickets = cursor.fetchone()[0]
 
         cursor.close()
         conn.close()
-        
+
     except Exception as e:
-        app.logger.exception("Could not fetch booking stats")
-        return render_template('booking.html', available=0, sold=0, db_error=str(e))
+        return f"DB Error ❌ {e}"
 
     available = max(TOTAL_TICKETS - sold_tickets, 0)
 
     if request.method == 'POST':
-        # 🔢 validate tickets
+
         try:
-            tickets = int(request.form.get('tickets', '0'))
-        except (TypeError, ValueError):
+            tickets = int(request.form.get('tickets'))
+        except:
             return "Invalid ticket input ❌"
 
         if tickets < 1:
@@ -479,9 +478,26 @@ def booking():
         if tickets > available:
             return f"Only {available} tickets left ❌"
 
-        # 💰 FINAL PRICE ONLY (no extra discount here)
-        price = get_final_price()
-        final_amount = int(tickets * price)
+        # 🔥 Override (highest priority)
+        if OVERRIDE_PRICE and OVERRIDE_PRICE.strip() != "":
+            price = int(OVERRIDE_PRICE)
+            final_amount = tickets * price
+
+        else:
+            # 👥 Group discount
+            if tickets == 6:
+                discount = 10
+            elif tickets >= 7:
+                discount = 15
+            else:
+                discount = 0
+
+            # 🌐 Compare with render discount
+            discount = max(discount, DISCOUNT_PERCENT)
+
+            # 💰 Final calculation
+            price_after_discount = BASE_PRICE - (BASE_PRICE * discount / 100)
+            final_amount = int(price_after_discount * tickets)
 
         session['tickets'] = tickets
         session['amount'] = final_amount
