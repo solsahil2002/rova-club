@@ -430,7 +430,10 @@ def booking():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT COALESCE(SUM(tickets),0) FROM bookings WHERE status='confirmed'")
+        # Count both pending + confirmed to avoid overselling before admin approval.
+        cursor.execute(
+            "SELECT COALESCE(SUM(tickets),0) FROM bookings WHERE status IN ('pending', 'confirmed')"
+        )
         sold_tickets = cursor.fetchone()[0]
 
         cursor.close()
