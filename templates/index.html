@@ -287,23 +287,37 @@
         <div class="subtitle">Luxury • Music • Cocktails • Night Vibes</div>
     
         <!-- 💰 PRICE SECTION -->
-        <div style="margin-top:20px; font-size:24px; color:white;">
-    
-            {% if override %}
-                <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
-                <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
-    
-            {% elif discount > 0 %}
-                <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
-                <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
-                <span style="color:red; font-size:16px;"> ({{ discount }}% OFF)</span>
-    
-            {% else %}
-                <span style="color:#00ffa6; font-weight:bold;">₹{{ price }}</span>
-            {% endif %}
-    
-        </div>
-    
+<div style="margin-top:20px; font-size:24px; color:white;">
+
+    {% if override %}
+        <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
+        <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
+
+    {% elif discount > 0 %}
+        <span style="text-decoration: line-through; color: grey;">₹{{ base_price }}</span>
+        <span style="color:#00ffa6; font-weight:bold;"> ₹{{ price }}</span>
+        <span style="color:red; font-size:16px;"> ({{ discount }}% OFF)</span>
+
+    {% else %}
+        <span style="color:#00ffa6; font-weight:bold;">₹{{ price }}</span>
+    {% endif %}
+
+</div>
+
+<!-- 👇 YAHAN PASTE KAR -->
+<div style="
+    margin-top:10px;
+    font-size:14px;
+    color:#00ffa6;
+    background: rgba(0,255,166,0.1);
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:8px;
+    border:1px solid rgba(0,255,166,0.3);
+">
+    🎟️ Early Bird Offer till 1st May
+</div>
+
         <a href="/login">
             <button class="btn">Get Started 🚀</button>
         </a>
